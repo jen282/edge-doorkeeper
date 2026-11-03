@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>합성 영상 재생</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { position: absolute; inset: 0; margin: auto; }
+  #status { position: fixed; left: 8px; bottom: 6px; color: #666; font: 12px sans-serif; }
+</style></head><body>
+<canvas id="screen"></canvas><div id="status"></div>
+<script>
+"use strict";
+const DATA = __DATA__;
+const W = DATA.width, H = DATA.height, FPS = DATA.fps, IDLE = Math.round(DATA.idle_s * FPS);
+const screen = document.getElementById("screen"), ctx = screen.getContext("2d");
+const small = document.createElement("canvas"); small.width = W; small.height = H;
+const sctx = small.getContext("2d"), img = sctx.createImageData(W, H);
+const clips = DATA.scenarios.map((s) => ({ id: s.id, n: s.n, bytes: Uint8Array.from(atob(s.b64), (c) => c.charCodeAt(0)) }));
+let clip = 0, k = 0, idle = 0, playing = true, calib = false;
+
+function fit() {  // 4:3을 유지하며 화면에 맞춘다
+  const s = Math.min(innerWidth / W, innerHeight / H);
+  screen.width = Math.floor(W * s); screen.height = Math.floor(H * s);
+}
+function draw(frameIdx, c) {
+  const off = frameIdx * W * H;
+  for (let i = 0; i < W * H; i++) {
+    const v = c.bytes[off + i]; img.data[4 * i] = v; img.data[4 * i + 1] = v; img.data[4 * i + 2] = v; img.data[4 * i + 3] = 255;
+  }
+  sctx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;  // 픽셀 계단을 부드럽게 (카메라 모아레 감소)
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(small, 0, 0, screen.width, screen.height);
+  if (calib) {
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.strokeRect(2, 2, screen.width - 4, screen.height - 4);
+    ctx.beginPath(); ctx.moveTo(screen.width / 2 - 20, screen.height / 2); ctx.lineTo(screen.width / 2 + 20, screen.height / 2);
+    ctx.moveTo(screen.width / 2, screen.height / 2 - 20); ctx.lineTo(screen.width / 2, screen.height / 2 + 20); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = "bold 28px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("↑ 위쪽 = 바깥", screen.width / 2, 40); ctx.fillText("아래쪽 = 매장 안 ↓", screen.width / 2, screen.height - 20);
+  }
+}
+function step() {
+  if (!playing) return;
+  const c = clips[clip];
+  if (k < c.n) { draw(k, c); k++; }
+  else if (idle < IDLE) { draw(0, c); idle++; }  // 시나리오 사이: 빈 바닥(0번 프레임은 사람이 화면 밖)
+  else { clip = (clip + 1) % clips.length; k = 0; idle = 0; }
+  document.getElementById("status").textContent =
+    `${clips[clip].id}  (${clip + 1}/${clips.length})  Space 재생/정지 · C 정렬 · F 전체 화면 · H 숨김`;
+}
+addEventListener("resize", fit);
+addEventListener("keydown", (e) => {
+  if (e.code === "Space") playing = !playing;
+  if (e.key === "c" || e.key === "C") { calib = !calib; draw(Math.max(0, Math.min(k, clips[clip].n - 1)), clips[clip]); }
+  if (e.key === "f" || e.key === "F") document.documentElement.requestFullscreen?.();
+  if (e.key === "h" || e.key === "H") { const s = document.getElementById("status"); s.hidden = !s.hidden; }
+});
+fit(); setInterval(step, 1000 / FPS);
+</script></body></html>
