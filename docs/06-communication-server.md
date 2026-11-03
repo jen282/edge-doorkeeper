@@ -162,14 +162,19 @@ class AuthEvent(Strict):
 
 ```
 server/
-├─ app.py          # FastAPI 라우터 (수집, 조회)
+├─ app.py          # FastAPI 앱 팩토리 create_app(cfg), 라우터, 오프라인 감시 태스크(lifespan)
+├─ config.py       # 설정값, 장기 체류 기준 허용 목록
 ├─ schemas.py      # 위 pydantic 모델
 ├─ db.py           # sqlite3 연결, 스키마 초기화(WAL)
-├─ rules.py        # 규칙 엔진: 순수 함수 evaluate(conn, now_ms, cfg) -> list[Alert]
+├─ rules.py        # 규칙 엔진: evaluate(conn, device_id, now_ms, ...), check_offline(conn, wall_ms, ...)
 ├─ static/         # 대시보드 HTML·JS (알림은 여기에만 표시, 외부 채널 없음)
-├─ watchdog.py     # 기기 오프라인 감지 (유일하게 서버 벽시계를 쓰는 규칙)
-└─ tests/          # pytest: 스키마, 규칙, API 통합 테스트
+└─ tests/          # pytest: 규칙 단위 테스트, API 통합·개인정보 경계 테스트
 ```
+
+- **실행**: `uvicorn server.app:create_app --factory --host 0.0.0.0 --port 8000`. 환경변수 `DOORKEEPER_DB`, `DOORKEEPER_DEVICE_TOKEN`
+- **동시성**: 핸들러가 모두 async라 이벤트 루프 한 곳에서 돈다. 그래서 SQLite 쓰기가 자연히 직렬화된다.
+- **오프라인 감지**: 유일하게 서버 벽시계를 쓰는 규칙이라 별도 모듈 대신 앱 lifespan의 5초 주기 태스크로 둔다. 판정 함수(`check_offline`)는 규칙 엔진에 두어, 벽시계를 주입해 테스트한다.
+- **검증 오류 응답**: 입력값을 되돌려주지 않는다 (잘못 들어온 데이터를 다시 노출하지 않기 위함).
 
 - **처리 순서**: heartbeat 수신 → 같은 트랜잭션 안에서 이벤트 저장 → `rules.evaluate(now = heartbeat.ts)` 실행 → 새 알림 INSERT → 커밋. 대시보드는 1초 폴링으로 새 알림을 가져간다
 - **테스트 용이성**: 규칙 엔진은 HTTP와 분리된 순수 함수다. 단위 테스트에서 DB에 이벤트를 넣고 `now`를 바꿔 가며 검증할 수 있다.
