@@ -1,0 +1,170 @@
+# CI: 모델 게이트, 서버 테스트, 펌웨어 빌드, 종단 검증. 설계와 기준은 docs/09-ci.md
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  model-gate:
+    name: 모델 게이트 (정확도·밀착·크기·연산자)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            sim/requirements.txt
+            ml/requirements.txt
+      - run: pip install -r sim/requirements.txt -r ml/requirements.txt
+      - name: 생성기·후처리 단위 테스트
+        run: pytest -q sim/tests ml/tests
+      - name: 테스트 세트 재생성 (고정 시드)
+        run: python -m sim.generate --split test --out data/test
+      - name: 테스트 세트 정답 해시 확인
+        run: python -m sim.hash_gt data/test | diff - sim/test_set.sha256
+      - name: 모델 평가와 게이트
+        run: |
+          python -m ml.evaluate \
+            --model ml/model.tflite \
+            --float-model ml/model_float.tflite \
+            --data data/test \
+            --gates ml/gates.yaml \
+            --report report/model.json \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: C 후처리 = Python 후처리 (펌웨어 계약)
+        run: python -m tools.postproc_parity --model ml/model.tflite --data data/test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-report
+          path: report/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-set
+          path: data/test/
+          retention-days: 1
+
+  server-test:
+    name: 서버 단위·API·개인정보 테스트
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: server/requirements*.txt
+      - run: pip install -r server/requirements.txt -r server/requirements-dev.txt
+      - run: ruff check .
+      - run: pytest -q server/tests --junitxml=report/server.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-report
+          path: report/
+
+  firmware-build:
+    name: 펌웨어 빌드 (ESP32-S3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: 커밋 금지 설정 검사 (Wi-Fi 비밀번호, 토큰)
+        run: |
+          # `! grep`은 set -e에서 실패가 무시되므로 if 문으로 검사한다
+          if grep -E '^CONFIG_DOORKEEPER_(WIFI_SSID|WIFI_PASSWORD|DEVICE_TOKEN|STREAM_TOKEN)="[^"]+"' firmware/sdkconfig.defaults; then
+            echo "::error::sdkconfig.defaults에 비밀값이 들어 있습니다"; exit 1
+          fi
+          for f in firmware/sdkconfig firmware/sdkconfig.local; do
+            if [ -f "$f" ]; then echo "::error::$f 는 커밋하면 안 됩니다"; exit 1; fi
+          done
+      - name: 빌드
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.3
+          target: esp32s3
+          path: firmware
+      - name: 앱 크기 검사 (factory 파티션 2MB의 90% 이하)
+        run: |
+          size=$(stat -c %s firmware/build/edge_doorkeeper.bin)
+          limit=$(( 2097152 * 90 / 100 ))
+          echo "앱 크기: ${size} / 한도: ${limit} bytes" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$size" -le "$limit" ]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            firmware/build/edge_doorkeeper.bin
+            firmware/build/bootloader/bootloader.bin
+            firmware/build/partition_table/partition-table.bin
+
+  e2e:
+    name: 종단 시나리오 (모델 → 후처리 → 서버 규칙)
+    needs: [model-gate, server-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            ml/requirements.txt
+            server/requirements*.txt
+      - run: pip install -r ml/requirements.txt -r server/requirements.txt -r server/requirements-dev.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-set
+          path: data/test
+      - name: 가상 기기로 시나리오 재생 → 서버 규칙 → 기대 알림과 대조
+        run: |
+          python -m tools.e2e_replay \
+            --model ml/model.tflite \
+            --data data/test \
+            --gates ml/gates.yaml \
+            --report report/e2e.json \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report
+          path: report/
+
+  docker:
+    name: 서버 Docker 이미지 (시간이 되면)
+    needs: server-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # hashFiles()는 잡 수준 if에서 쓸 수 없어 스텝마다 조건을 단다. Dockerfile이 없으면 건너뛴다
+      - name: 이미지 빌드
+        if: hashFiles('server/Dockerfile') != ''
+        run: docker build -t edge-doorkeeper-server:${{ github.sha }} server
+      - name: 기동 확인
+        if: hashFiles('server/Dockerfile') != ''
+        run: |
+          docker run -d --name srv -p 8000:8000 edge-doorkeeper-server:${{ github.sha }}
+          for i in $(seq 1 20); do
+            curl -fsS localhost:8000/healthz && exit 0
+            sleep 1
+          done
+          docker logs srv
+          exit 1
