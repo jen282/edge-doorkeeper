@@ -1,0 +1,38 @@
+# 비밀값·로컬 설정
+firmware/sdkconfig
+firmware/sdkconfig.old
+.env
+*.env
+
+# ESP-IDF 빌드 산출물
+firmware/build/
+firmware/managed_components/
+
+# 생성 데이터·리포트 (CI가 고정 시드로 재생성)
+data/
+report/
+*.bin
+
+# 학습 산출물 (배포용 model.tflite, model_float.tflite는 커밋)
+ml/checkpoints/
+ml/runs/
+*.keras
+*.h5
+
+# 로컬 DB
+*.db
+*.sqlite
+*.db-wal
+*.db-shm
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# OS·편집기
+.DS_Store
+.vscode/
+.idea/
