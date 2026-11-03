@@ -1,0 +1,8 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "RUF"]
+# numpy 실수에 round()를 쓰면 numpy 타입이 남을 수 있어, JSON용 int() 변환을 명시적으로 유지한다
+# 한국어 주석·문서의 ×, ·, → 같은 기호는 의도한 것이다
+ignore = ["RUF046", "RUF001", "RUF002", "RUF003"]
