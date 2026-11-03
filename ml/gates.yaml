@@ -1,0 +1,19 @@
+# CI model-gate 기준. 근거: docs/01-requirements.md 1.4절, docs/09-ci.md 1.2절
+# 기준을 낮춰서 통과시키지 않는다. 바꿀 때는 이유를 커밋 메시지에 남긴다.
+model:
+  max_size_bytes: 262144
+  allowed_ops: [CONV_2D, DEPTHWISE_CONV_2D, LOGISTIC]  # 펌웨어 MicroMutableOpResolver와 일치해야 함
+  input:  {shape: [1, 72, 96, 1], dtype: int8, scale: 0.00392157, zero_point: -128}  # 펌웨어: int8 = uint8 - 128
+  output: {shape: [1, 9, 12, 1],  dtype: int8}
+accuracy:
+  single_min: 0.90
+  adjacent_min: 0.70
+  adjacent_categories: [side_by_side, front_back]
+  excluded_categories: [occluded_pair]   # 알려진 한계. 보고만 함
+  quant_drop_max_pp: 2.0
+e2e:
+  tailgate_recall_min: 0.80
+  tailgate_precision_min: 0.80
+firmware:
+  app_partition_bytes: 2097152
+  max_usage_ratio: 0.90
