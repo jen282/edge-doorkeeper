@@ -1,6 +1,7 @@
 # 비밀값·로컬 설정
 firmware/sdkconfig
 firmware/sdkconfig.old
+firmware/sdkconfig.local
 .env
 *.env
 

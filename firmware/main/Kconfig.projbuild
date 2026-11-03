@@ -1,0 +1,35 @@
+menu "edge-doorkeeper"
+
+    config DOORKEEPER_DEVICE_ID
+        string "기기 ID (소문자·숫자·하이픈)"
+        default "door-01"
+
+    config DOORKEEPER_REPLAY_REALTIME
+        bool "재생을 시나리오 FPS에 맞춰 실시간으로 (끄면 최대 속도: PC 동치성 확인용)"
+        default y
+
+    config DOORKEEPER_WIFI_SSID
+        string "Wi-Fi SSID (sdkconfig.local에 둔다)"
+        default ""
+
+    config DOORKEEPER_WIFI_PASSWORD
+        string "Wi-Fi 비밀번호 (sdkconfig.local에 둔다, 커밋 금지)"
+        default ""
+
+    config DOORKEEPER_SERVER_URL
+        string "서버 주소 (예: http://192.168.0.10:8000)"
+        default ""
+
+    config DOORKEEPER_DEVICE_TOKEN
+        string "X-Device-Token 값 (sdkconfig.local에 둔다, 커밋 금지)"
+        default ""
+
+    config DOORKEEPER_LIVE_VIEW
+        bool "실시간 뷰 (:81/stream). 영상은 브라우저로만 가고 저장하지 않는다"
+        default y
+
+    config DOORKEEPER_STREAM_TOKEN
+        string "실시간 뷰 토큰 (sdkconfig.local에 둔다, 커밋 금지)"
+        default ""
+
+endmenu
