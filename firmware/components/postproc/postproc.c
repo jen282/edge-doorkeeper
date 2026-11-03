@@ -188,7 +188,8 @@ int pp_counter_update(pp_counter_t *c, const pp_peak_t *peaks, int n_peaks, int 
             if (n_ev < max_out) {
                 // nearbyint: 기본 반올림 모드(짝수 쪽)라 Python round()와 같다
                 out[n_ev++] = (pp_event_t){tr->tid, tr->start == PP_ZONE_A ? 1 : -1,
-                                           (int64_t)nearbyint(tr->has_mid ? tr->mid_t_ms : t_ms), frame_idx};
+                                           (int64_t)nearbyint(tr->has_mid ? tr->mid_t_ms : t_ms), frame_idx,
+                                           peaks[pi].score};
             }
             tr->start = z;
         }

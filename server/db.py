@@ -76,7 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_logs_dev_ts ON device_logs(device_id, ts);
 
 CREATE TABLE IF NOT EXISTS occupancy_resets (
   id        INTEGER PRIMARY KEY,
-  device_id TEXT    NOT NULL REFERENCES devices(device_id),
+  device_id TEXT    NOT NULL,              -- 외래키 없음: 기기가 접속하기 전에도 기준점을 넣을 수 있게(재생 데모)
   ts        INTEGER NOT NULL,
   reason    TEXT    NOT NULL CHECK (reason IN ('manual', 'scheduled', 'test'))
 );

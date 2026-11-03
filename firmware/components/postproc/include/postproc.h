@@ -55,6 +55,7 @@ typedef struct {
     int direction;  // +1 입장(IN), -1 퇴장(OUT)
     int64_t ts_offset_ms;
     int frame;
+    double score;  // 계수 순간의 피크 확률 (서버의 conf)
 } pp_event_t;
 
 void pp_config_default(pp_config_t *cfg);

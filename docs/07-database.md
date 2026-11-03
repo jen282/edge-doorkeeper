@@ -27,7 +27,6 @@
 erDiagram
   devices ||--o{ passages : "기록"
   devices ||--o{ device_logs : "보고"
-  devices ||--o{ occupancy_resets : "기준점"
   settings ||--o{ settings_log : "변경 이력"
   devices {
     TEXT device_id PK
@@ -93,7 +92,7 @@ erDiagram
   }
   occupancy_resets {
     INTEGER id PK
-    TEXT device_id FK
+    TEXT device_id
     INTEGER ts
     TEXT reason
   }
@@ -180,7 +179,7 @@ CREATE INDEX idx_logs_dev_ts ON device_logs(device_id, ts);
 
 CREATE TABLE occupancy_resets (
   id        INTEGER PRIMARY KEY,
-  device_id TEXT    NOT NULL REFERENCES devices(device_id),
+  device_id TEXT    NOT NULL,              -- 외래키 없음: 기기가 접속하기 전에도 기준점을 넣을 수 있게(재생 데모)
   ts        INTEGER NOT NULL,
   reason    TEXT    NOT NULL CHECK (reason IN ('manual', 'scheduled', 'test'))
 );

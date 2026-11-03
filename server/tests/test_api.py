@@ -105,6 +105,17 @@ def test_hourly_stats(client):
     assert rows == [{"hour_kst": "2026-11-03 14:00", "n_in": 1, "n_out": 1, "n_allowed": 1}]
 
 
+def test_reset_before_device_connects_isolates_scenarios(client):
+    # 재생 데모: 기기가 접속하기 전에 시나리오 시작 시각마다 기준점을 넣어 둔다
+    r = client.post("/v1/occupancy/reset", json={"device_id": "door-01", "ts": T0 + 60_000, "reason": "test"})
+    assert r.status_code == 200
+    client.put("/v1/settings/t_long_ms", json={"value": 30_000})
+    client.post("/v1/auth", json={"auth_id": "a0", "door_id": "door-01", "ts": T0 - 1000}, headers=TOKEN)
+    post(client, batch(ps(1, T0), hb(2, T0 + 120_000)))  # 첫 시나리오의 입장자는 다음 시나리오에서 세지 않는다
+    o = client.get("/v1/occupancy").json()
+    assert (o["occupancy_now"], o["long_stay_confirmed"]) == (0, 0)
+
+
 def test_schema_has_no_blob_or_image_columns(client):  # 개인정보: 이미지 저장 경로 자체가 없다
     conn = client.app_conn
     tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]

@@ -65,3 +65,9 @@ class AuthEvent(Strict):
 
 class SettingValue(Strict):
     value: int
+
+
+class ResetRequest(Strict):
+    device_id: str | None = Field(default=None, pattern=r"^[a-z0-9-]{1,32}$")
+    ts: int | None = None
+    reason: Literal["manual", "test"] = "manual"

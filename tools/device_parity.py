@@ -21,6 +21,8 @@ from ml.evaluate import predict
 from ml.postproc import run_scenario
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# 우리 태그 로그만 보여 준다 (Wi-Fi 라이브러리 로그에는 SSID·IP가 있을 수 있다)
+OWN_LOG = re.compile(r"^[IWE] \(\d+\) (model|main|frames|net|uplink):")
 
 
 def read_device(port: str, timeout_s: float) -> list[str]:
@@ -54,7 +56,7 @@ def main() -> int:
 
     lines = read_device(args.port, args.timeout)
     for line in lines:
-        if line.startswith(("I (", "W (", "E (")) and ("model" in line or "main" in line or "frames" in line):
+        if OWN_LOG.match(line):
             print("  기기:", line)
     dev: dict[str, list[tuple]] = {}
     for line in lines:

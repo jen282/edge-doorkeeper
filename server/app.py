@@ -24,7 +24,7 @@ from pydantic import TypeAdapter, ValidationError
 from server import rules
 from server.config import ALLOWED_T_LONG_MS, Config
 from server.db import connect, get_setting
-from server.schemas import AuthEvent, DeviceBatch, SettingValue
+from server.schemas import AuthEvent, DeviceBatch, ResetRequest, SettingValue
 
 STATIC_DIR = Path(__file__).parent / "static"
 _AUTH_LIST = TypeAdapter(list[AuthEvent])
@@ -307,14 +307,22 @@ def create_app(cfg: Config | None = None) -> FastAPI:
         return {"t_long_ms": body.value, "allowed_t_long_ms": list(ALLOWED_T_LONG_MS)}
 
     @app.post("/v1/occupancy/reset")
-    async def reset_occupancy():
-        """카운트 오차 보정: 지금 시점(마지막 heartbeat)을 인원 0의 기준점으로 삼는다."""
-        dev, hb = _current(conn)
-        if dev is None or hb is None:
-            raise HTTPException(409, "no device heartbeat yet")
-        conn.execute("INSERT INTO occupancy_resets (device_id, ts, reason) VALUES (?, ?, 'manual')",
-                     (dev["device_id"], hb["ts"]))
-        return {"device_id": dev["device_id"], "ts": hb["ts"]}
+    async def reset_occupancy(body: ResetRequest | None = None):
+        """인원 0의 기준점을 넣는다. 본문이 없으면 '지금(마지막 heartbeat) 수동 보정'.
+
+        재생 데모는 시나리오마다 시작 시각에 reason=test 기준점을 미리 넣는다 (tools/auth_injector.py).
+        """
+        body = body or ResetRequest()
+        device_id, ts = body.device_id, body.ts
+        if device_id is None or ts is None:
+            dev, hb = _current(conn)
+            if dev is None or hb is None:
+                raise HTTPException(409, "no device heartbeat yet")
+            device_id = device_id or dev["device_id"]
+            ts = ts if ts is not None else hb["ts"]
+        conn.execute("INSERT INTO occupancy_resets (device_id, ts, reason) VALUES (?, ?, ?)",
+                     (device_id, ts, body.reason))
+        return {"device_id": device_id, "ts": ts, "reason": body.reason}
 
     @app.get("/healthz")
     async def healthz():

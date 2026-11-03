@@ -28,7 +28,7 @@
 | POST | `/v1/alerts/{id}/ack` | 대시보드 | 알림 확인 처리 | 반드시 |
 | GET | `/` | 브라우저 | 대시보드 정적 HTML | 반드시 |
 | GET | `/healthz` | CI, 운영자 | 상태 확인 | 반드시 |
-| POST | `/v1/occupancy/reset` | 운영자 | 인원 수 기준점 초기화 (카운트 오차 보정) | 시간이 되면 |
+| POST | `/v1/occupancy/reset` | 운영자, 모의 인증 주입기 | 인원 수 기준점 추가. 본문 `{device_id?, ts?, reason: manual\|test}`. 본문이 없으면 '지금(마지막 heartbeat) 수동 보정'. 재생 데모는 시나리오 시작마다 `reason=test`를 미리 넣는다 | 반드시 (데모) |
 
 **ESP32 쪽 엔드포인트** (서버가 아니라 기기의 두 번째 httpd)
 

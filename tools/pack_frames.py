@@ -4,7 +4,8 @@
     parttool.py -p /dev/cu.usbmodem101 write_partition --partition-name frames --input data/frames.bin
 
 시나리오는 모델 정답 여부와 무관하게 '조건'으로만 고른다(PC↔기기 동치성 확인용, 체리피킹 방지).
-장기 체류·심야 시나리오는 유휴 구간과 시작 시각을 덮어써서 만든다.
+시작 시각은 14:00 KST부터 2분 간격으로 다시 배치하고(심야 시나리오만 01:00), 장기 체류 시나리오는
+유휴 구간을 늘린다. 인증·정답은 시나리오 시작 기준 오프셋이라 그대로 유효하다.
 
 바이너리 형식 (little-endian)
   헤더 20B : magic "EDFR", version u16, width u16, height u16, fps u16, n_scenarios u32, reserved u32
@@ -28,7 +29,9 @@ ENTRY = struct.Struct("<16sqIIII")
 PARTITION_BYTES = 0x500000
 TAIL_IDLE_S = 6  # 시나리오 뒤 heartbeat만 보내는 구간. 출입 세션(간격 5초)이 닫히도록
 LONG_STAY_IDLE_S = 40  # 대시보드 기준 30초(데모)에서 장기 체류가 확정되도록
-NIGHT_SHIFT_MS = 11 * 3_600_000  # 14:00 KST 기준 → 다음 날 01:00 KST
+FIRST_START_MS = 1_793_682_000_000  # 2026-11-03 14:00 KST
+SLOT_MS = 120_000  # 시나리오를 2분 간격으로 순서대로 배치 (대시보드에서 시간순으로 읽히게)
+NIGHT_START_MS = FIRST_START_MS + 11 * 3_600_000  # 다음 날 01:00 KST
 
 # (이름, 조건, 덮어쓰기). 조건은 범주·세부유형·인증·기대 알림만 본다
 PICKS = [
@@ -71,9 +74,9 @@ def main() -> None:
     first = picks[0][1]
     blobs, entries, manifest = [], [], []
     offset = HEADER.size + ENTRY.size * len(picks)
-    for name, m, over in picks:
+    for k, (name, m, over) in enumerate(picks):
         f = frames[m["scenario_id"]]
-        start = m["scenario_start_ms"] + (NIGHT_SHIFT_MS if over.get("night") else 0)
+        start = NIGHT_START_MS if over.get("night") else FIRST_START_MS + k * SLOT_MS
         idle = over.get("idle_gap_s", TAIL_IDLE_S)
         entries.append(ENTRY.pack(m["scenario_id"].encode(), start, len(f), offset, idle, 0))
         blobs.append(f.tobytes())
