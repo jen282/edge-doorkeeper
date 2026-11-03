@@ -13,5 +13,3 @@
 | `server/` | FastAPI + SQLite + 규칙 엔진 + 대시보드 |
 | `tools/` | 프레임 패키징, 모의 인증 주입기, 종단(e2e) 재생 |
 | `.github/workflows/` | CI (`docs/09-ci.md`) |
-
-작업 규칙은 `CLAUDE.md`를 따른다.
