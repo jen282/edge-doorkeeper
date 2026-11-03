@@ -116,6 +116,13 @@ def test_reset_starts_count_from_zero(conn):
     assert run(conn, T0 + 60_000) == []
 
 
+def test_auth_rules_can_be_disabled_for_camera_demo(conn):
+    cfg = Config(db_path=":memory:", device_token="t", watchdog_interval_s=0, auth_rules=False)
+    set_t_long(conn, 30_000)
+    passage(conn, T0)  # 인증 없는 입장
+    assert evaluate(conn, "door-01", T0 + 40_000, 0, cfg) == [f"long_stay:{T0}:1"]  # 미인증 입장 알림 없음
+
+
 def test_device_offline_once_per_gap(conn):  # TC-22 (서버 쪽)
     assert check_offline(conn, 5_000, CFG) == []
     assert check_offline(conn, 20_000, CFG) == ["device_offline:door-01:0"]

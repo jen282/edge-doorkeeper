@@ -94,8 +94,9 @@ def _current(conn: sqlite3.Connection) -> tuple[sqlite3.Row | None, sqlite3.Row 
     dev = conn.execute("SELECT * FROM devices ORDER BY last_seen_ms DESC LIMIT 1").fetchone()
     if dev is None:
         return None, None
+    # 가장 '늦은 시각'이 아니라 가장 '최근에 받은' heartbeat. 재생 모드는 부팅이 바뀌면 시나리오 시각이 뒤로 갈 수 있다
     hb = conn.execute(
-        "SELECT * FROM device_logs WHERE device_id = ? AND kind = 'heartbeat' ORDER BY ts DESC LIMIT 1",
+        "SELECT * FROM device_logs WHERE device_id = ? AND kind = 'heartbeat' ORDER BY id DESC LIMIT 1",
         (dev["device_id"],),
     ).fetchone()
     return dev, hb
@@ -207,6 +208,7 @@ def create_app(cfg: Config | None = None) -> FastAPI:
             "long_stay_confirmed": occ["long_stay_confirmed"],
             "t_long_ms": t_long,
             "unacked_alerts": unacked,
+            "auth_rules": cfg.auth_rules,
             "device": {
                 "device_id": dev["device_id"],
                 "online": wall_ms() - dev["last_seen_ms"] <= cfg.offline_ms,

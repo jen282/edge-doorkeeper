@@ -109,9 +109,9 @@ def evaluate(conn: sqlite3.Connection, device_id: str, now_ms: int, now_wall_ms:
     """heartbeat(또는 설정 변경) 시점에 규칙을 평가하고 새로 생긴 알림의 dedup_key 목록을 돌려준다."""
     new: list[str] = []
 
-    # 동반입장·미인증 입장: 닫힌 출입 세션만 판정
+    # 동반입장·미인증 입장: 닫힌 출입 세션만 판정 (인증 대조를 끈 시연에서는 건너뜀)
     params = {"since": now_ms - cfg.session_lookback_ms, "now": now_ms, "gap_ms": cfg.session_gap_ms}
-    for s in conn.execute(SESSION_SQL, params).fetchall():
+    for s in conn.execute(SESSION_SQL, params).fetchall() if cfg.auth_rules else []:
         type_ = "tailgate" if s["allowed"] > 0 else "unauth_entry"
         key = f"{type_}:{s['start_ts']}"
         if insert_alert(conn, now_wall_ms, type_, "warn", s["start_ts"], s["end_ts"], key,

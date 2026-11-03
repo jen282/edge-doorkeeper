@@ -107,6 +107,7 @@ function renderOccupancy(o) {
   $("asof").textContent = o.as_of_kst
     ? `기준 시각 ${o.as_of_kst}${o.mode === "replay" ? " (재생 모드: 시나리오 시각)" : ""}`
     : "기준 시각 - (기기 신호 대기 중)";
+  $("auth-mode").textContent = o.auth_rules === false ? "· 인증 대조 꺼짐 (시연 모드)" : "";
   $("occ").textContent = o.occupancy_now;
   $("in-today").textContent = o.in_today;
   $("long").textContent = o.long_stay_confirmed;

@@ -21,3 +21,6 @@ class Config:
     tz_offset_h: int = 9  # Asia/Seoul (서머타임 없음)
     max_body_bytes: int = 16 * 1024
     stream_port: int = 81
+    # 출입 인증 대조(동반입장·미인증 입장). 인증 장치 없이 하는 카메라 시연에서는 0으로 끈다.
+    # 끄지 않으면 인증이 없는 모든 입장이 '미인증 입장'이 된다
+    auth_rules: bool = field(default_factory=lambda: os.environ.get("DOORKEEPER_AUTH_RULES", "1") != "0")

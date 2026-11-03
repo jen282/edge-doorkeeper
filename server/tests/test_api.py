@@ -116,6 +116,13 @@ def test_reset_before_device_connects_isolates_scenarios(client):
     assert (o["occupancy_now"], o["long_stay_confirmed"]) == (0, 0)
 
 
+def test_current_heartbeat_is_latest_received_not_latest_ts(client):
+    # 이전 부팅의 심야 시나리오(늦은 시각) heartbeat 뒤에 새 재생(이른 시각)이 시작된 경우
+    post(client, batch(hb(1, T0 + 11 * 3_600_000), boot_id=6))
+    post(client, batch(hb(1, T0 + 2000), boot_id=7))
+    assert client.get("/v1/occupancy").json()["as_of_kst"] == "2026-11-03 14:00:02"
+
+
 def test_dashboard_is_served(client):
     r = client.get("/")
     assert r.status_code == 200 and "무인가게 출입 이상 탐지" in r.text
