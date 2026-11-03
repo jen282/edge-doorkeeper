@@ -24,8 +24,12 @@ MIX = {"train": TRAIN_MIX, "val": TEST_MIX, "test": TEST_MIX}
 ID_PREFIX = {"single": "sg", "side_by_side": "sb", "front_back": "fb", "opposite": "op",
              "negative": "ng", "group3": "g3", "occluded_pair": "oc"}
 
+# test의 '학습에 있던 질감' 절반. 이 목록을 바꾸면 test 난수 흐름과 정답 해시가 바뀐다
 SEEN_TEXTURES = ("plain", "tiles", "noise", "speckle")
-HELDOUT_TEXTURE = "planks"  # test 전용: 학습에서 본 적 없는 바닥
+# 학습·검증은 질감을 넓게 무작위화한다(도메인 랜덤화). 처음엔 위 4종만 썼다가, 처음 보는 줄무늬
+# 바닥에서 바닥 전체를 머리로 판단하는 지름길 학습이 드러나 추가했다 (docs/05-data.md 1.4절)
+TRAIN_TEXTURES = (*SEEN_TEXTURES, "grating", "grid", "mats", "multiscale")
+HELDOUT_TEXTURE = "terrazzo"  # test 전용: 학습 질감과 통계가 다른 작은 돌 조각(블롭) 바닥
 
 Y_FAR = 1.0  # 시작·끝 위치(m). 아이·카트의 어깨·윗면까지 화면 밖에 있도록 충분히 멀리
 
@@ -340,10 +344,13 @@ def build_scenario(split: str, index: int, category: str, camera: Camera | None 
     duration = max(end + rng.uniform(0.3, 0.8), 1.5)
     n_frames = int(math.ceil(duration * FPS))
 
-    if split == "test" and rng.random() < 0.5:
-        texture = HELDOUT_TEXTURE
+    if split == "test":
+        if rng.random() < 0.5:
+            texture = HELDOUT_TEXTURE
+        else:
+            texture = SEEN_TEXTURES[int(rng.integers(len(SEEN_TEXTURES)))]
     else:
-        texture = SEEN_TEXTURES[int(rng.integers(len(SEEN_TEXTURES)))]
+        texture = TRAIN_TEXTURES[int(rng.integers(len(TRAIN_TEXTURES)))]
     if split == "test" and rng.random() < 0.2:  # 극단 조명
         gain = rng.uniform(0.45, 0.6) if rng.random() < 0.5 else rng.uniform(1.5, 1.8)
     else:

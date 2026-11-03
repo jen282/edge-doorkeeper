@@ -99,6 +99,14 @@ def _bilinear(grid: np.ndarray) -> np.ndarray:
     return np.array([np.interp(ys, np.arange(gh), rows[:, j]) for j in range(WIDTH)]).T
 
 
+def _grating(rng: np.random.Generator) -> np.ndarray:
+    ang, period, phase = rng.uniform(0, math.pi), rng.uniform(3, 16), rng.uniform(0, 2 * math.pi)
+    wave = np.sin(2 * math.pi * (_XX * math.cos(ang) + _YY * math.sin(ang)) / period + phase)
+    if rng.random() < 0.5:
+        wave = np.sign(wave)  # 사각파: 판재 이음매처럼 경계가 선명
+    return rng.uniform(0.03, 0.12) * wave
+
+
 def make_background(rng: np.random.Generator, texture: str, base: float) -> np.ndarray:
     grad = rng.uniform(-0.1, 0.1) * (_XX / WIDTH - 0.5) + rng.uniform(-0.1, 0.1) * (_YY / HEIGHT - 0.5)
     if texture == "plain":
@@ -116,10 +124,34 @@ def make_background(rng: np.random.Generator, texture: str, base: float) -> np.n
         bg = base + grad + rng.uniform(0.08, 0.15) * _bilinear(rng.normal(0, 1, (10, 13)))
     elif texture == "speckle":
         bg = base + grad + rng.normal(0, 0.03, (HEIGHT, WIDTH))
-    elif texture == "planks":
-        ang, period, phase = rng.uniform(0, math.pi), rng.uniform(6, 12), rng.uniform(0, 2 * math.pi)
-        stripes = np.sign(np.sin(2 * math.pi * (_XX * math.cos(ang) + _YY * math.sin(ang)) / period + phase))
-        bg = base + grad + 0.06 * stripes + rng.normal(0, 0.015, (HEIGHT, WIDTH))
+    elif texture == "grating":  # 마루·줄무늬 매트. 30%는 두 방향 교차
+        bg = base + grad + _grating(rng)
+        if rng.random() < 0.3:
+            bg += _grating(rng)
+    elif texture == "grid":
+        ang, step = rng.uniform(0, math.pi), rng.uniform(6, 20)
+        u = _XX * math.cos(ang) + _YY * math.sin(ang) + rng.uniform(0, step)
+        v = -_XX * math.sin(ang) + _YY * math.cos(ang) + rng.uniform(0, step)
+        lines = ((u % step) < 1.0) | ((v % step) < 1.0)
+        bg = base + grad + np.where(lines, rng.choice([-1, 1]) * rng.uniform(0.05, 0.2), 0.0)
+    elif texture == "mats":  # 매트·그림자 같은 큰 사각형
+        bg = base + grad
+        for _ in range(int(rng.integers(1, 5))):
+            cx, cy = rng.uniform(0, WIDTH), rng.uniform(0, HEIGHT)
+            hw, hh, ang = rng.uniform(5, 30), rng.uniform(5, 30), rng.uniform(0, math.pi)
+            u = (_XX - cx) * math.cos(ang) + (_YY - cy) * math.sin(ang)
+            v = -(_XX - cx) * math.sin(ang) + (_YY - cy) * math.cos(ang)
+            bg = np.where((np.abs(u) < hw) & (np.abs(v) < hh), bg + rng.uniform(-0.3, 0.3), bg)
+    elif texture == "multiscale":
+        bg = base + grad
+        for gh, gw in ((4, 5), (8, 11), (16, 21), (36, 48)):
+            bg += rng.uniform(0.0, 0.08) * _bilinear(rng.normal(0, 1, (gh, gw)))
+    elif texture == "terrazzo":  # test 전용
+        bg = base + grad + rng.normal(0, 0.015, (HEIGHT, WIDTH))
+        for _ in range(int(rng.integers(150, 400))):
+            cx, cy, r = rng.uniform(0, WIDTH), rng.uniform(0, HEIGHT), rng.uniform(0.6, 2.0)
+            chip = (_XX - cx) ** 2 + (_YY - cy) ** 2 <= r * r
+            bg = np.where(chip, base + rng.choice([-1, 1]) * rng.uniform(0.1, 0.35), bg)
     else:
         raise ValueError(f"unknown texture: {texture}")
     return np.clip(bg, 0.0, 1.0)
