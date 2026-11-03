@@ -116,6 +116,12 @@ def test_reset_before_device_connects_isolates_scenarios(client):
     assert (o["occupancy_now"], o["long_stay_confirmed"]) == (0, 0)
 
 
+def test_dashboard_is_served(client):
+    r = client.get("/")
+    assert r.status_code == 200 and "무인가게 출입 이상 탐지" in r.text
+    assert client.get("/app.js").status_code == 200
+
+
 def test_schema_has_no_blob_or_image_columns(client):  # 개인정보: 이미지 저장 경로 자체가 없다
     conn = client.app_conn
     tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]

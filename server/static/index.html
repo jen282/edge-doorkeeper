@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>무인가게 출입 이상 탐지</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb;
+    --accent: #2f6fde; --warn: #c26a00; --warn-bg: #fff4e5; --crit: #c5221f; --crit-bg: #fdecea;
+    --ok: #1e8e3e; --info-bg: #eef3fd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b1f27; --text: #e6e8ec; --muted: #9aa3b2; --line: #2b313c;
+      --accent: #7aa7ff; --warn: #ffb44d; --warn-bg: #3a2a12; --crit: #ff7b72; --crit-bg: #3d1c1c;
+      --ok: #5fd07e; --info-bg: #1d2a42;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 12px 16px;
+           background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0 8px 0 0; }
+  .meta { color: var(--muted); font-size: 14px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
+  .dot.on { background: var(--ok); } .dot.off { background: var(--crit); }
+  .badge { background: var(--crit); color: #fff; border-radius: 10px; padding: 0 8px; font-size: 13px; font-weight: 600; }
+  .badge.zero { background: var(--line); color: var(--muted); }
+  #banner { display: none; padding: 10px 16px; font-weight: 600; }
+  #banner.warn { display: block; background: var(--warn-bg); color: var(--warn); }
+  #banner.crit { display: block; background: var(--crit-bg); color: var(--crit); }
+  main { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; padding: 16px;
+         max-width: 1280px; margin: 0 auto; }
+  /* 1fr은 내용의 최소 폭 아래로 줄지 않아 좁은 화면에서 넘친다 → minmax(0, 1fr) */
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); padding: 12px; } }
+  .side { display: grid; gap: 16px; align-content: start; grid-template-columns: minmax(0, 1fr); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  section h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+  #view { position: relative; aspect-ratio: 4 / 3; background: #0d0f13; border-radius: 6px; overflow: hidden; }
+  #view img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: none; }
+  #view .placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+                       justify-content: center; color: #9aa3b2; text-align: center; padding: 16px; gap: 4px; }
+  .viewbar { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .viewbar input { flex: 1; min-width: 140px; }
+  .note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .kpi .label { color: var(--muted); font-size: 13px; }
+  .kpi .value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi .value small { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .kpi.alert .value { color: var(--warn); }
+  .setting { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  select, input, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+                          border-radius: 6px; padding: 5px 8px; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); }
+  #alerts { list-style: none; margin: 0; padding: 0; max-height: 52vh; overflow-y: auto; }
+  #alerts li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 6px;
+               border-bottom: 1px solid var(--line); }
+  #alerts li.unacked { background: var(--info-bg); }
+  #alerts li.unacked.warn { background: var(--warn-bg); }
+  #alerts li.unacked.crit { background: var(--crit-bg); }
+  #alerts .title { font-weight: 600; }
+  #alerts .time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  #alerts .desc { grid-column: 1 / 2; font-size: 14px; }
+  #alerts button { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+  .empty { color: var(--muted); padding: 12px 0; }
+  .error { color: var(--crit); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>무인가게 출입 이상 탐지</h1>
+  <span class="meta" id="asof">기준 시각 -</span>
+  <span class="meta"><span class="dot" id="dev-dot"></span><span id="dev-text">기기 정보 없음</span></span>
+  <span class="meta">미확인 알림 <span class="badge zero" id="unacked">0</span></span>
+  <span class="error" id="conn-error"></span>
+</header>
+<div id="banner"></div>
+<main>
+  <section>
+    <h2>실시간 영상</h2>
+    <div id="view">
+      <img id="stream" alt="실시간 영상">
+      <div class="placeholder" id="view-msg"><strong>영상 연결 안 됨</strong><span id="view-reason">기기 정보 없음</span></div>
+    </div>
+    <div class="viewbar">
+      <input id="stream-token" type="password" placeholder="실시간 영상 조회 패스워드 입력" autocomplete="off">
+      <button id="stream-connect">연결</button>
+    </div>
+    <p class="note">영상은 서버에 전달되거나 녹화되지 않습니다.</p>
+  </section>
+  <div class="side">
+    <section>
+      <h2>인원 집계</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="label">현재 매장 인원</div><div class="value" id="occ">-</div></div>
+        <div class="kpi"><div class="label">오늘 누적 입장</div><div class="value" id="in-today">-</div></div>
+        <div class="kpi" id="long-kpi"><div class="label">장기 체류 인원</div><div class="value" id="long">-</div></div>
+      </div>
+      <div class="setting">
+        <label for="t-long">장기 체류 기준</label>
+        <select id="t-long"></select>
+        <span class="error" id="t-long-error"></span>
+      </div>
+      <p class="note">장기 체류 인원은 '현재 인원 − 최근 기준 시간 안에 들어온 인원'으로, 확실히 기준 이상 머문 사람 수입니다.
+        손님이 계속 드나들면 확정이 늦어질 수 있습니다.</p>
+    </section>
+    <section>
+      <h2>알림</h2>
+      <ul id="alerts"><li class="empty">알림 없음</li></ul>
+    </section>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
