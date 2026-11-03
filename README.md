@@ -13,3 +13,12 @@
 | `server/` | FastAPI + SQLite + 규칙 엔진 + 대시보드 |
 | `tools/` | 프레임 패키징, 모의 인증 주입기, 종단(e2e) 재생 |
 | `.github/workflows/` | CI (`docs/09-ci.md`) |
+
+## 실행 (시연)
+
+```bash
+tools/flash.sh replay     # 모드를 바꿀 때만: 펌웨어·프레임 쓰기 (replay | camera)
+tools/demo.sh replay      # 매번: 서버(새 DB) → 인증 주입 → 보드 리셋. 대시보드 http://localhost:8000
+```
+
+Wi-Fi 정보와 토큰은 커밋하지 않는 `firmware/sdkconfig.local`에 둔다. 결과는 `docs/results.md`.
