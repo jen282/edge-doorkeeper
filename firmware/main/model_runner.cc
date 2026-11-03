@@ -14,7 +14,9 @@ extern const uint8_t model_end[] asm("_binary_model_tflite_end");
 namespace {
 const char *TAG = "model";
 constexpr size_t kArenaSize = 96 * 1024;  // 추정치(docs/04-model.md 1.7절). 실제 사용량은 부팅 로그로 확인
-alignas(16) uint8_t g_arena[kArenaSize];  // 내부 SRAM (속도 우선)
+// PSRAM에 둔다. 처음엔 속도를 위해 내부 SRAM에 뒀으나, 카메라+실시간 영상 시청 중 내부 힙 최소 여유가
+// 5.5KB까지 떨어져(실측) 옮겼다. 추론은 조금 느려질 수 있다
+uint8_t *g_arena = nullptr;
 tflite::MicroInterpreter *g_interp = nullptr;
 TfLiteTensor *g_in = nullptr;
 TfLiteTensor *g_out = nullptr;
@@ -41,6 +43,11 @@ extern "C" bool model_init(void)
     resolver.AddConv2D();
     resolver.AddDepthwiseConv2D();
     resolver.AddLogistic();
+    g_arena = static_cast<uint8_t *>(heap_caps_aligned_alloc(16, kArenaSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (!g_arena) {
+        ESP_LOGE(TAG, "아레나 할당 실패 (PSRAM)");
+        return false;
+    }
     static tflite::MicroInterpreter interp(model, resolver, g_arena, kArenaSize);
     if (interp.AllocateTensors() != kTfLiteOk) {
         ESP_LOGE(TAG, "AllocateTensors 실패: 아레나(%u bytes) 부족", (unsigned)kArenaSize);

@@ -1,3 +1,5 @@
 dependencies:
   idf: ">=5.3"
   espressif/esp-tflite-micro: "^1.3.0"
+  # 카메라 구동(카메라 모드)과 JPEG 인코더(실시간 영상, 두 모드 공통)
+  espressif/esp32-camera: "^2.0.0"

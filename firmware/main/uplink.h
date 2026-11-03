@@ -28,7 +28,7 @@ typedef struct {
     };
 } uplink_event_t;
 
-void uplink_init(uint32_t boot_id, const char *model_version);
+void uplink_init(uint32_t boot_id, const char *model_version, const char *mode);  // mode: replay | camera
 void uplink_start(void);  // 전송 태스크 (코어 0)
 void uplink_push(uplink_event_t *ev);
 uint32_t uplink_dropped(void);

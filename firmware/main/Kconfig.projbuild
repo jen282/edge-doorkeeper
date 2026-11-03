@@ -4,9 +4,32 @@ menu "edge-doorkeeper"
         string "기기 ID (소문자·숫자·하이픈)"
         default "door-01"
 
+    choice DOORKEEPER_SOURCE
+        prompt "프레임 소스"
+        default DOORKEEPER_SOURCE_REPLAY
+        help
+            카메라 빌드: DOORKEEPER_SOURCE=camera idf.py -B build_camera -D SDKCONFIG=build_camera/sdkconfig build
+
+        config DOORKEEPER_SOURCE_REPLAY
+            bool "Flash 'frames' 파티션 재생 (합성 시나리오, 시나리오 시각)"
+        config DOORKEEPER_SOURCE_CAMERA
+            bool "카메라 OV2640/OV3660 (실제 시각, SNTP 필요)"
+    endchoice
+
     config DOORKEEPER_REPLAY_REALTIME
         bool "재생을 시나리오 FPS에 맞춰 실시간으로 (끄면 최대 속도: PC 동치성 확인용)"
         default y
+        depends on DOORKEEPER_SOURCE_REPLAY
+
+    config DOORKEEPER_CAMERA_HMIRROR
+        bool "카메라 좌우 반전"
+        default n
+        depends on DOORKEEPER_SOURCE_CAMERA
+
+    config DOORKEEPER_CAMERA_VFLIP
+        bool "카메라 상하 반전 (영상 위쪽 = 바깥이 되게 맞춘다)"
+        default n
+        depends on DOORKEEPER_SOURCE_CAMERA
 
     config DOORKEEPER_WIFI_SSID
         string "Wi-Fi SSID (sdkconfig.local에 둔다)"
@@ -25,11 +48,11 @@ menu "edge-doorkeeper"
         default ""
 
     config DOORKEEPER_LIVE_VIEW
-        bool "실시간 뷰 (:81/stream). 영상은 브라우저로만 가고 저장하지 않는다"
+        bool "실시간 영상 (:81/stream). 영상은 브라우저로만 가고 저장하지 않는다"
         default y
 
     config DOORKEEPER_STREAM_TOKEN
-        string "실시간 뷰 토큰 (sdkconfig.local에 둔다, 커밋 금지)"
+        string "실시간 영상 조회 패스워드 (sdkconfig.local에 둔다, 커밋 금지). 비어 있으면 스트림을 열지 않는다"
         default ""
 
 endmenu

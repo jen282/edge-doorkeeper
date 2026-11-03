@@ -22,14 +22,16 @@ static const char *TAG = "uplink";
 static QueueHandle_t s_q;
 static uint32_t s_boot_id;
 static const char *s_model_version;
+static const char *s_mode;
 static uint32_t s_seq;
 static volatile uint32_t s_dropped;
 static uint32_t s_rejected;
 
-void uplink_init(uint32_t boot_id, const char *model_version)
+void uplink_init(uint32_t boot_id, const char *model_version, const char *mode)
 {
     s_boot_id = boot_id;
     s_model_version = model_version;
+    s_mode = mode;
     s_q = xQueueCreate(QUEUE_LEN, sizeof(uplink_event_t));  // 초기화 때 한 번만 할당
 }
 
@@ -57,11 +59,12 @@ static int write_event(char *buf, size_t cap, const uplink_event_t *e)
         return snprintf(buf, cap,
                         "{\"kind\":\"heartbeat\",\"seq\":%u,\"ts\":%lld,\"fps\":%.2f,\"infer_ms_p50\":%u,"
                         "\"infer_ms_max\":%u,\"free_heap\":%u,\"min_free_heap\":%u,\"stack_hwm\":%u,"
-                        "\"arena_used\":%u,\"dropped\":%u,\"wifi_rssi\":%d,\"mode\":\"replay\",\"scenario_id\":\"%s\"}",
+                        "\"arena_used\":%u,\"dropped\":%u,\"wifi_rssi\":%d,\"mode\":\"%s\",\"scenario_id\":%s%s%s}",
                         (unsigned)e->seq, (long long)e->ts, e->hb.fps, (unsigned)e->hb.infer_ms_p50,
                         (unsigned)e->hb.infer_ms_max, (unsigned)e->hb.free_heap, (unsigned)e->hb.min_free_heap,
-                        (unsigned)e->hb.stack_hwm, (unsigned)e->hb.arena_used, (unsigned)s_dropped, e->hb.rssi,
-                        e->hb.scenario_id);
+                        (unsigned)e->hb.stack_hwm, (unsigned)e->hb.arena_used, (unsigned)s_dropped, e->hb.rssi, s_mode,
+                        // 카메라 모드는 시나리오가 없으므로 null
+                        e->hb.scenario_id[0] ? "\"" : "null", e->hb.scenario_id, e->hb.scenario_id[0] ? "\"" : "");
     case UP_BOOT:
         return snprintf(buf, cap, "{\"kind\":\"boot\",\"seq\":%u,\"ts\":%lld,\"reset_reason\":\"%s\"}",
                         (unsigned)e->seq, (long long)e->ts, e->boot.reset_reason);

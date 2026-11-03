@@ -1,0 +1,2 @@
+# 카메라 빌드에만 더하는 설정 (비밀값 없음)
+CONFIG_DOORKEEPER_SOURCE_CAMERA=y
